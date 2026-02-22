@@ -694,16 +694,6 @@ jobs:
             sed -i "s/linker='\\([^']*\\)'/linker=\\1/g" feeds/packages/lang/rust/cargo.mk || true
           fi
           
-          # 2. 针对 at-webserver 的 Makefile 进行同样的修复
-          if [ -d "package/luci-app-at-webserver" ]; then
-            find package/luci-app-at-webserver -type f -name Makefile -exec sed -i 's/TARGET_CC/TARGET_CC_NOCACHE/g' {} + || true
-            find package/luci-app-at-webserver -type f -name Makefile -exec sed -i 's/TARGET_CXX/TARGET_CXX_NOCACHE/g' {} + || true
-            # 【关键】剥离动态变量的单引号
-            find package/luci-app-at-webserver -type f -name Makefile -exec sed -i "s/linker='\\([^']*\\)'/linker=\\1/g" {} + || true
-            # 【关键】剥离直接写死的单引号 (如果有的话)
-            find package/luci-app-at-webserver -type f -name Makefile -exec sed -i "s/'aarch64-openwrt-linux-musl-gcc'/aarch64-openwrt-linux-musl-gcc/g" {} + || true
-          fi
-          
           # ⭐ 修复 ebtables 下载问题
           EBTABLES_MAKEFILE="package/network/utils/ebtables/Makefile"
           if [ -f "$EBTABLES_MAKEFILE" ]; then
