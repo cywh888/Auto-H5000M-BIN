@@ -969,6 +969,9 @@ jobs:
                 echo "CONFIG_PACKAGE_luci-i18n-netspeedtest-zh-cn=y" >> .config
                 ;;
               at_webserver)
+                # 👇 显式选中我们重构的 Rust 后端核心包
+                echo "CONFIG_PACKAGE_at-webserver=y" >> .config
+                # 选中前端界面
                 echo "CONFIG_PACKAGE_luci-app-at-webserver=y" >> .config
                 echo "CONFIG_PACKAGE_luci-i18n-at-webserver-zh-cn=y" >> .config
                 ;;
