@@ -833,6 +833,16 @@ jobs:
 
           cat base.config > .config
 
+          # [修复] 如果未启用任何 Modem 插件，显式禁用默认的 luci-app-modem
+          # 因为 base.config 默认开启了它，若不处理会导致"自动启用"
+          if [ "$EN_QN" != "true" ] && [ "$EN_Q" != "true" ] && [ "$EN_OM" != "true" ]; then
+            echo "ℹ️ 未启用任何 Modem，显式禁用原版 Modem"
+            sed -i '/CONFIG_PACKAGE_luci-app-modem=y/d' .config
+            sed -i '/CONFIG_PACKAGE_modem=y/d' .config
+            echo "# CONFIG_PACKAGE_luci-app-modem is not set" >> .config
+            echo "# CONFIG_PACKAGE_modem is not set" >> .config
+          fi
+
           echo "🔧 基于 plugins.json 循环生成 .config..."
           TRUE_KEYS=$(jq -r 'to_entries | map(select(.key | startswith("enable_")) | select(.value == true or .value == "true") | .key) | join(" ")' "$CFG")
           
