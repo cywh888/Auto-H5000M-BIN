@@ -683,17 +683,6 @@ jobs:
           # 禁用 reject 检查
           sed -i 's/exit 1/echo "Continuing despite rejects"/' scripts/patch-kernel.sh || true
           
-          # ⭐ 修复 Rust/Cargo 链接器被单引号包裹导致找不到文件的问题
-          echo "🔧 修复 Rust 链接器引号与 ccache 冲突..."
-          
-          # 1. 修复全局的 cargo.mk 模板
-          if [ -f "feeds/packages/lang/rust/cargo.mk" ]; then
-            # 替换为无 ccache 的纯净编译器
-            sed -i 's/TARGET_CC/TARGET_CC_NOCACHE/g' feeds/packages/lang/rust/cargo.mk || true
-            # 【关键】剥离单引号：将 linker='xxx' 改为 linker=xxx
-            sed -i "s/linker='\\([^']*\\)'/linker=\\1/g" feeds/packages/lang/rust/cargo.mk || true
-          fi
-          
           # ⭐ 修复 ebtables 下载问题
           EBTABLES_MAKEFILE="package/network/utils/ebtables/Makefile"
           if [ -f "$EBTABLES_MAKEFILE" ]; then
@@ -1038,10 +1027,6 @@ jobs:
           
           echo "🔧 预构建工具链..."
           [ -d "staging_dir" ] && [ -n "$(ls -A staging_dir 2>/dev/null)" ] && echo "✅ 工具链已缓存" || make toolchain/install -j$THREADS || true
-          
-          echo "🧹 强制清理 Rust 旧缓存..."
-          rm -rf build_dir/target-*/host/rustc* 2>/dev/null || true
-          find dl -name "rustc-1.90.0-src*" -delete 2>/dev/null || true
           
           if make -j$THREADS IGNORE_ERRORS=n; then
             END_TIME=$(date +%s)
