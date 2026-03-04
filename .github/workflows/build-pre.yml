@@ -263,7 +263,7 @@ jobs:
           
           NST_ENABLED=$(jq -r '.enable_netspeedtest // false' "$GITHUB_WORKSPACE/config/plugins.json")
           if [[ "$NST_ENABLED" == "True" || "$NST_ENABLED" == "true" ]] && [ ! -d "package/luci-app-netspeedtest" ]; then
-            git clone https://github.com/sirpdboy/luci-app-netspeedtest.git -b master package/luci-app-netspeedtest
+            git clone https://github.com/muink/luci-app-netspeedtest.git -b master package/luci-app-netspeedtest
           fi
           
           LUCKY_ENABLED=$(jq -r '.enable_lucky // false' "$GITHUB_WORKSPACE/config/plugins.json")
