@@ -13,11 +13,6 @@ on:
         required: false
         default: false
         type: boolean
-      enable_wireguard:
-        description: '启用 WireGuard'
-        required: false
-        default: false
-        type: boolean
       enable_nikki:
         description: '启用 Nikki'
         required: false
