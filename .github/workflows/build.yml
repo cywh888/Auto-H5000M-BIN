@@ -113,6 +113,26 @@ on:
         required: false
         default: false
         type: boolean
+      enable_wireguard:
+        description: '启用 WireGuard'
+        required: false
+        default: false
+        type: boolean
+      enable_wireguard:
+        description: '启用 WireGuard'
+        required: false
+        default: false
+        type: boolean
+      enable_wireguard:
+        description: '启用 WireGuard'
+        required: false
+        default: false
+        type: boolean
+      enable_wireguard:
+        description: '启用 WireGuard'
+        required: false
+        default: false
+        type: boolean
   repository_dispatch:
     types:
       - Source Code Update
@@ -246,6 +266,7 @@ jobs:
             ENABLE_LUCKY="${{ github.event.inputs.enable_lucky || 'false' }}"
             ENABLE_BANDIX="${{ github.event.inputs.enable_bandix || 'false' }}"
             ENABLE_DAED="${{ github.event.inputs.enable_daed || 'false' }}"
+            ENABLE_WIREGUARD="${{ github.event.inputs.enable_wireguard || 'false' }}"
           else
             if [ -f "config/plugins.json" ]; then
               echo "📂 自动触发，发现缓存配置，读取 config/plugins.json"
@@ -280,6 +301,7 @@ jobs:
           : ${ENABLE_LUCKY:=false}
           : ${ENABLE_BANDIX:=false}
           : ${ENABLE_DAED:=false}
+          : ${ENABLE_WIREGUARD:=false}
           
           # 输出配置到 GITHUB_OUTPUT
           echo "enable_adguardhome=$ENABLE_ADGUARDHOME" >> $GITHUB_OUTPUT
@@ -304,6 +326,7 @@ jobs:
           echo "enable_lucky=$ENABLE_LUCKY" >> $GITHUB_OUTPUT
           echo "enable_bandix=$ENABLE_BANDIX" >> $GITHUB_OUTPUT
           echo "enable_daed=$ENABLE_DAED" >> $GITHUB_OUTPUT
+          echo "enable_wireguard=$ENABLE_WIREGUARD" >> $GITHUB_OUTPUT
           
           # 显示最终配置
           echo "📋 最终使用的配置:"
@@ -329,6 +352,7 @@ jobs:
           echo "• Lucky: $ENABLE_LUCKY"
           echo "• Bandix: $ENABLE_BANDIX"
           echo "• Daed: $ENABLE_DAED"
+          echo "• WireGuard: $ENABLE_WIREGUARD"
 
       - name: 生成标准数据源 plugins.json
         run: |
@@ -357,7 +381,8 @@ jobs:
             "enable_easytier": "${{ steps.set-env.outputs.enable_easytier }}",
             "enable_lucky": "${{ steps.set-env.outputs.enable_lucky }}",
             "enable_bandix": "${{ steps.set-env.outputs.enable_bandix }}",
-            "enable_daed": "${{ steps.set-env.outputs.enable_daed }}"
+            "enable_daed": "${{ steps.set-env.outputs.enable_daed }}",
+            "enable_wireguard": "${{ steps.set-env.outputs.enable_wireguard }}"
           }
           EOF
           )
@@ -885,6 +910,12 @@ jobs:
                 echo "CONFIG_KERNEL_NET_CLS_ACT=y" >> .config
                 echo "CONFIG_KERNEL_BPF_STREAM_PARSER=y" >> .config
                 echo "CONFIG_KERNEL_KPROBE_EVENTS=y" >> .config
+                ;;
+              wireguard)
+                echo "CONFIG_PACKAGE_luci-proto-wireguard=y" >> .config
+                echo "CONFIG_PACKAGE_luci-app-wireguard=y" >> .config
+                echo "CONFIG_PACKAGE_wireguard-tools=y" >> .config
+                echo "CONFIG_PACKAGE_kmod-wireguard=y" >> .config
                 ;;
               nikki)
                 echo "CONFIG_PACKAGE_nikki=y" >> .config
