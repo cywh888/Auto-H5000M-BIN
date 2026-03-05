@@ -993,7 +993,7 @@ jobs:
             cat "$GITHUB_WORKSPACE/h5000m.extra.config" >> .config
           fi
 
-          all_disabled=("luci-app-sms-tool-lite" "luci-app-3ginfo-lite")
+          all_disabled=("luci-app-sms-tool-lite" "luci-app-3ginfo-lite" "luci-app-wrtbwmon" "wrtbwmon")
           for pkg in "${all_disabled[@]}"; do
              sed -i "/^CONFIG_PACKAGE_${pkg}=/d" .config
              echo "# CONFIG_PACKAGE_${pkg} is not set" >> .config
