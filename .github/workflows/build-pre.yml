@@ -272,8 +272,8 @@ jobs:
           echo "📥 克隆第三方仓库..."
           
           NST_ENABLED=$(jq -r '.enable_netspeedtest // false' "$GITHUB_WORKSPACE/config/plugins.json")
-          if [[ "$NST_ENABLED" == "True" || "$NST_ENABLED" == "true" ]] && [ ! -d "package/luci-app-netspeedtest" ]; then
-            git clone https://github.com/muink/luci-app-netspeedtest.git -b master package/luci-app-netspeedtest
+          if [[ "$NST_ENABLED" == "True" || "$NST_ENABLED" == "true" ]] && [ ! -d "package/netspeedtest" ]; then
+            git clone https://github.com/sirpdboy/netspeedtest.git -b main package/netspeedtest
           fi
           
           LUCKY_ENABLED=$(jq -r '.enable_lucky // false' "$GITHUB_WORKSPACE/config/plugins.json")
