@@ -113,6 +113,11 @@ on:
         required: false
         default: false
         type: boolean
+      enable_etherwake:
+        description: '启用 EtherWake (网络唤醒)'
+        required: false
+        default: false
+        type: boolean
       enable_wireguard:
         description: '启用 WireGuard'
         required: false
@@ -251,6 +256,7 @@ jobs:
             ENABLE_LUCKY="${{ github.event.inputs.enable_lucky || 'false' }}"
             ENABLE_BANDIX="${{ github.event.inputs.enable_bandix || 'false' }}"
             ENABLE_DAED="${{ github.event.inputs.enable_daed || 'false' }}"
+            ENABLE_ETHERWAKE="${{ github.event.inputs.enable_etherwake || 'false' }}"
             ENABLE_WIREGUARD="${{ github.event.inputs.enable_wireguard || 'false' }}"
           else
             if [ -f "config/plugins.json" ]; then
@@ -286,6 +292,7 @@ jobs:
           : ${ENABLE_LUCKY:=false}
           : ${ENABLE_BANDIX:=false}
           : ${ENABLE_DAED:=false}
+          : ${ENABLE_ETHERWAKE:=false}
           : ${ENABLE_WIREGUARD:=false}
           
           # 输出配置到 GITHUB_OUTPUT
@@ -311,6 +318,7 @@ jobs:
           echo "enable_lucky=$ENABLE_LUCKY" >> $GITHUB_OUTPUT
           echo "enable_bandix=$ENABLE_BANDIX" >> $GITHUB_OUTPUT
           echo "enable_daed=$ENABLE_DAED" >> $GITHUB_OUTPUT
+          echo "enable_etherwake=$ENABLE_ETHERWAKE" >> $GITHUB_OUTPUT
           echo "enable_wireguard=$ENABLE_WIREGUARD" >> $GITHUB_OUTPUT
           
           # 显示最终配置
@@ -337,6 +345,7 @@ jobs:
           echo "• Lucky: $ENABLE_LUCKY"
           echo "• Bandix: $ENABLE_BANDIX"
           echo "• Daed: $ENABLE_DAED"
+          echo "• EtherWake: $ENABLE_ETHERWAKE"
           echo "• WireGuard: $ENABLE_WIREGUARD"
 
       - name: 生成标准数据源 plugins.json
@@ -367,6 +376,7 @@ jobs:
             "enable_lucky": "${{ steps.set-env.outputs.enable_lucky }}",
             "enable_bandix": "${{ steps.set-env.outputs.enable_bandix }}",
             "enable_daed": "${{ steps.set-env.outputs.enable_daed }}",
+            "enable_etherwake": "${{ steps.set-env.outputs.enable_etherwake }}",
             "enable_wireguard": "${{ steps.set-env.outputs.enable_wireguard }}"
           }
           EOF
@@ -895,6 +905,11 @@ jobs:
                 echo "CONFIG_KERNEL_NET_CLS_ACT=y" >> .config
                 echo "CONFIG_KERNEL_BPF_STREAM_PARSER=y" >> .config
                 echo "CONFIG_KERNEL_KPROBE_EVENTS=y" >> .config
+                ;;
+              etherwake)
+                echo "CONFIG_PACKAGE_luci-app-etherwake=y" >> .config
+                echo "CONFIG_PACKAGE_luci-i18n-etherwake-zh-cn=y" >> .config
+                echo "CONFIG_PACKAGE_etherwake=y" >> .config
                 ;;
               wireguard)
                 echo "CONFIG_PACKAGE_luci-proto-wireguard=y" >> .config

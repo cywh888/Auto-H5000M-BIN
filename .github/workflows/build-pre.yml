@@ -8,6 +8,11 @@ on:
         required: false
         default: false
         type: boolean
+      enable_etherwake:
+        description: '启用 EtherWake (网络唤醒)'
+        required: false
+        default: false
+        type: boolean
       enable_wireguard:
         description: '启用 WireGuard'
         required: false
@@ -132,6 +137,7 @@ jobs:
           
           echo "🧭 手动触发，优先使用 UI 传入的 inputs"
           ENABLE_DAED="${{ github.event.inputs.enable_daed || 'false' }}"
+          ENABLE_ETHERWAKE="${{ github.event.inputs.enable_etherwake || 'false' }}"
           ENABLE_WIREGUARD="${{ github.event.inputs.enable_wireguard || 'false' }}"
           ENABLE_NIKKI="${{ github.event.inputs.enable_nikki || 'false' }}"
           ENABLE_NETSPEEDTEST="${{ github.event.inputs.enable_netspeedtest || 'false' }}"
@@ -142,6 +148,7 @@ jobs:
           
           # 确保所有变量都有值（默认为 false）
           : ${ENABLE_DAED:=false}
+          : ${ENABLE_ETHERWAKE:=false}
           : ${ENABLE_WIREGUARD:=false}
           : ${ENABLE_NIKKI:=false}
           : ${ENABLE_NETSPEEDTEST:=false}
@@ -152,6 +159,7 @@ jobs:
           
           # 输出配置到 GITHUB_OUTPUT
           echo "enable_daed=$ENABLE_DAED" >> $GITHUB_OUTPUT
+          echo "enable_etherwake=$ENABLE_ETHERWAKE" >> $GITHUB_OUTPUT
           echo "enable_wireguard=$ENABLE_WIREGUARD" >> $GITHUB_OUTPUT
           echo "enable_nikki=$ENABLE_NIKKI" >> $GITHUB_OUTPUT
           echo "enable_netspeedtest=$ENABLE_NETSPEEDTEST" >> $GITHUB_OUTPUT
@@ -163,6 +171,7 @@ jobs:
           # 显示最终配置
           echo "📋 最终使用的配置 (XR30):"
           echo "• Daed: $ENABLE_DAED"
+          echo "• EtherWake: $ENABLE_ETHERWAKE"
           echo "• WireGuard: $ENABLE_WIREGUARD"
           echo "• Nikki: $ENABLE_NIKKI"
           echo "• NetSpeedTest: $ENABLE_NETSPEEDTEST"
@@ -178,6 +187,7 @@ jobs:
           CURRENT_JSON=$(cat << 'EOF'
           {
             "enable_daed": "${{ steps.set-env.outputs.enable_daed }}",
+            "enable_etherwake": "${{ steps.set-env.outputs.enable_etherwake }}",
             "enable_wireguard": "${{ steps.set-env.outputs.enable_wireguard }}",
             "enable_nikki": "${{ steps.set-env.outputs.enable_nikki }}",
             "enable_netspeedtest": "${{ steps.set-env.outputs.enable_netspeedtest }}",
@@ -430,6 +440,11 @@ jobs:
                 echo "CONFIG_KERNEL_NET_CLS_ACT=y" >> .config
                 echo "CONFIG_KERNEL_BPF_STREAM_PARSER=y" >> .config
                 echo "CONFIG_KERNEL_KPROBE_EVENTS=y" >> .config
+                ;;
+              etherwake)
+                echo "CONFIG_PACKAGE_luci-app-etherwake=y" >> .config
+                echo "CONFIG_PACKAGE_luci-i18n-etherwake-zh-cn=y" >> .config
+                echo "CONFIG_PACKAGE_etherwake=y" >> .config
                 ;;
               wireguard)
                 echo "CONFIG_PACKAGE_luci-proto-wireguard=y" >> .config
