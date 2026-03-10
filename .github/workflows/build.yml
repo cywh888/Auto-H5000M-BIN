@@ -907,8 +907,8 @@ jobs:
                 echo "CONFIG_KERNEL_KPROBE_EVENTS=y" >> .config
                 ;;
               etherwake)
-                echo "CONFIG_PACKAGE_luci-app-etherwake=y" >> .config
-                echo "CONFIG_PACKAGE_luci-i18n-etherwake-zh-cn=y" >> .config
+                echo "CONFIG_PACKAGE_luci-app-wol=y" >> .config
+                echo "CONFIG_PACKAGE_luci-i18n-wol-zh-cn=y" >> .config
                 echo "CONFIG_PACKAGE_etherwake=y" >> .config
                 ;;
               wireguard)
