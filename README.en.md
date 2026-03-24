@@ -6,7 +6,7 @@
 
 [![Build ImmortalWrt H5000M](https://github.com/shi-an/Auto-H5000M-BIN/actions/workflows/build.yml/badge.svg)](https://github.com/shi-an/Auto-H5000M-BIN/actions/workflows/build.yml)
 
-Built from [padavanonly/immortalwrt-mt798x-24.10](https://github.com/padavanonly/immortalwrt-mt798x-24.10), branch [`mt798x-mt799x-6.6-mtwifi`](https://github.com/padavanonly/immortalwrt-mt798x-24.10/tree/mt798x-mt799x-6.6-mtwifi).
+Built from [padavanonly/immortalwrt-mt798x-24.10](https://github.com/padavanonly/immortalwrt-mt798x-24.10), branch [`mt798x-mt799x-6.6-mtwifi`](https://github.com/padavanonly/immortalwrt-mt798x-24.10/tree/mt798x-mt799x-6.6-mtwifi), auto-compiling firmware for the H5000M router.
 
 ---
 
@@ -24,85 +24,59 @@ Go to the [Releases](https://github.com/shi-an/Auto-H5000M-BIN/releases) page to
 | **Username** | `root` |
 | **Password** | `admin` |
 
-> **Web UI Language**: LuCI supports English. Go to *System → System → Language and Style → Language → English* to switch.
-
----
-
-## 🛠️ Hardware Acceleration
-
-This firmware is built on the dedicated MT798x/MT799x kernel tree, which includes:
-
-- **MediaTek WED** (Wireless Ethernet Dispatch) — included via upstream platform support
-- **MediaTek HNAT** (Hardware NAT) — included via upstream platform support
-- **TurboACC-MTK** — optional MTK hardware acceleration (selectable at build time)
-- **EQoS-MTK** — optional MTK traffic QoS (selectable at build time)
-
-> When neither TurboACC nor EQoS is selected, **BBR** congestion control is enabled by default (`net.ipv4.tcp_congestion_control=bbr`).
-
 ---
 
 ## 📦 Plugins
 
 ### 🎯 Pre-installed
 
-| Plugin | Description |
-|--------|-------------|
-| Argon Theme | Modern LuCI theme |
-| Airpifanctrl | Fan speed control |
-| RamFree | Memory release utility |
-| AutoReboot | Scheduled reboot |
-| ttyd | Web-based terminal |
+- **TurboACC-MTK** - MTK hardware acceleration
+- **EQoS-MTK** - Network traffic control
+- **Airpifanctrl** - Fan control
+- **Argon Theme** - UI theme
+- **RamFree** - Memory release
+- **AutoReboot** - Scheduled reboot
+- **ttyd** - Web terminal
 
 ### 📋 Optional (selectable at build time)
 
 #### 🌐 Network
 
-| Plugin | Description |
-|--------|-------------|
-| TurboACC-MTK | MTK hardware acceleration |
-| EQoS-MTK | MTK traffic QoS |
-| QModem | 5G/LTE modem management (Quectel, Fibocom, etc.) |
-| QModem Next | QModem next-generation version |
-| AT WebServer | AT command web interface for 5G modems |
-| HomeProxy | Multi-protocol modern proxy |
-| OpenClash | Clash-based proxy client (kernel pre-installed) |
-| Nikki | Transparent proxy tool |
-| MWAN3 | Multi-WAN load balancing |
-| UPnP | Automatic port mapping |
-| ZeroTier | Virtual LAN |
-| EasyTier | Decentralized mesh networking |
-| Lucky | Network toolbox |
-| WireGuard | WireGuard VPN |
-| WatchCat | Network watchdog and auto-restart |
-| NetSpeedTest | Network speed test |
+- **QModem** - 5G/LTE modem management (Quectel, Fibocom, etc.)
+- **QModem Next** - QModem next-generation version
+- **HomeProxy** - Multi-protocol modern proxy
+- **OpenClash** - Clash-based proxy client (kernel pre-installed)
+- **Nikki** - Transparent proxy tool
+- **MWAN3** - Multi-WAN load balancing
+- **UPnP** - Automatic port mapping
+- **ZeroTier** - Virtual LAN
+- **EasyTier** - Decentralized mesh networking
+- **Lucky** - Network toolbox
 
 #### 🛡️ System
 
-| Plugin | Description |
-|--------|-------------|
-| AdGuardHome | Ad blocking & DNS |
-| Adbyby Plus | Ad filtering |
-| MosDNS | Modern DNS server |
-| Vlmcsd | KMS activation server |
-| DockerMan | Docker management |
-| Bandix | Network traffic analysis |
-| EtherWake | Wake-on-LAN |
-| Daed | eBPF-based transparent proxy |
+- **AdGuardHome** - Ad blocking & DNS
+- **Adbyby Plus** - Ad filtering
+- **MosDNS** - Modern DNS server
+- **Vlmcsd** - KMS activation server
+- **DockerMan** - Docker management
+- **WatchCat** - Network watchdog and auto-restart
+- **NetSpeedTest** - Network speed test
+- **Bandix** - Network traffic analysis
+- **WRtBWMon** - Bandwidth monitor
 
 ---
 
-## ⏰ Build Workflows
+## ⏰ Build Schedule
 
-| Workflow | Purpose |
-|----------|---------|
-| `build.yml` | H5000M release build — published as latest Release |
-| `build-pre.yml` | MT798x pre-release / test build |
-| `update-checker.yml` | Monitors upstream source for updates |
+- **Main release (build.yml)**: H5000M production build, auto-published as latest Release
+- **Test build (build-pre.yml)**: MT798x test build, published as pre-release
 
 ### 📝 Notes
 
-- **Plugin config memory**: The system saves your last plugin selection. The next build will use the same configuration by default.
-- **Upstream sync**: The update checker periodically monitors the upstream source repo and triggers a rebuild when new commits are detected.
+- **Plugin config memory**: The system automatically saves your last plugin selection and uses it as default for the next build
+- **Upstream sync**: Periodically checks the upstream source repo for updates to ensure the firmware is built from the latest source
+- **Multi-workflow support**: Multiple build workflows available for different build needs
 
 ---
 
@@ -112,6 +86,7 @@ This firmware is built on the dedicated MT798x/MT799x kernel tree, which include
 - [QModem Project](https://github.com/FUjr/QModem)
 - [OpenWrt-nikki](https://github.com/nikkinikki-org/OpenWrt-nikki)
 - [ImmortalWrt Official](https://immortalwrt.org/)
+- [Project Repository](https://github.com/shi-an/Auto-H5000M-BIN)
 
 ---
 
