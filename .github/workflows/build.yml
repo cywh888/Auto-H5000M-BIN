@@ -83,11 +83,6 @@ on:
         required: false
         default: false
         type: boolean
-      enable_wrtbwmon:
-        description: '启用 wrtbwmon'
-        required: false
-        default: false
-        type: boolean
       enable_watchcat:
         description: '启用 watchcat'
         required: false
