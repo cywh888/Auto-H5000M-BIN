@@ -63,7 +63,6 @@ Go to the [Releases](https://github.com/shi-an/Auto-H5000M-BIN/releases) page to
 - **WatchCat** - Network watchdog and auto-restart
 - **NetSpeedTest** - Network speed test
 - **Bandix** - Network traffic analysis
-- **WRtBWMon** - Bandwidth monitor
 
 ---
 

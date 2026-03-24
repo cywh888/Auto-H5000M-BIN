@@ -63,7 +63,6 @@
 - **WatchCat** - 网络监控和自动重启
 - **NetSpeedTest** - 网络测速
 - **Bandix** - 网络流量分析
-- **WRtBWMon** - 带宽监控
 
 ---
 
