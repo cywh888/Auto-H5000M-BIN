@@ -1,5 +1,7 @@
 # 🚀 ImmortalWrt H5000M 自动编译
 
+> 🌐 Language / 语言：**简体中文** | [English](README.en.md)
+
 **Auto-H5000M-BIN**：ImmortalWrt H5000M 固件自动化构建工作流，支持插件管理与源码更新检查。
 
 [![Build ImmortalWrt H5000M](https://github.com/shi-an/Auto-H5000M-BIN/actions/workflows/build.yml/badge.svg)](https://github.com/shi-an/Auto-H5000M-BIN/actions/workflows/build.yml)
