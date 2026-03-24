@@ -12,7 +12,7 @@
 
 ## 📥 下载固件
 
-前往 [Releases](https://github.com/existyay/Auto-H5000M-BIN/releases) 页面下载最新固件。
+前往 [Releases](https://github.com/shi-an/Auto-H5000M-BIN/releases) 页面下载最新固件。
 
 ---
 
