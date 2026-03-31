@@ -927,9 +927,9 @@ jobs:
                 echo "CONFIG_PACKAGE_kmod-nft-socket=y" >> .config
                 echo "CONFIG_PACKAGE_kmod-nft-tproxy=y" >> .config
                 echo "CONFIG_PACKAGE_kmod-tun=y" >> .config
-                echo "CONFIG_PACKAGE_kmod-nfnetlink-queue" >> .config
-                echo "CONFIG_PACKAGE_kmod-nft-queue" >> .config
-                echo "CONFIG_PACKAGE_kmod-dummy" >> .config
+                echo "CONFIG_PACKAGE_kmod-nfnetlink-queue=y" >> .config
+                echo "CONFIG_PACKAGE_kmod-nft-queue=y" >> .config
+                echo "CONFIG_PACKAGE_kmod-dummy=y" >> .config
                 ;;
               openclash)
                 echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config
