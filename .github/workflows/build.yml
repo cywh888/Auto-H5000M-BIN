@@ -681,7 +681,9 @@ jobs:
               echo "CONFIG_PACKAGE_kmod-inet-diag=y" >> features.config
               echo "CONFIG_PACKAGE_kmod-nft-socket=y" >> features.config
               echo "CONFIG_PACKAGE_kmod-nft-tproxy=y" >> features.config
-              echo "CONFIG_PACKAGE_kmod-tun=y" >> features.config
+              echo "CONFIG_PACKAGE_kmod-nfnetlink-queue" >> features.config
+              echo "CONFIG_PACKAGE_kmod-nft-queue" >> features.config
+              echo "CONFIG_PACKAGE_kmod-dummy" >> features.config
           fi
           
           echo "✅ 插件配置关联完成"
@@ -925,6 +927,9 @@ jobs:
                 echo "CONFIG_PACKAGE_kmod-nft-socket=y" >> .config
                 echo "CONFIG_PACKAGE_kmod-nft-tproxy=y" >> .config
                 echo "CONFIG_PACKAGE_kmod-tun=y" >> .config
+                echo "CONFIG_PACKAGE_kmod-nfnetlink-queue" >> .config
+                echo "CONFIG_PACKAGE_kmod-nft-queue" >> .config
+                echo "CONFIG_PACKAGE_kmod-dummy" >> .config
                 ;;
               openclash)
                 echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config
