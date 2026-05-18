@@ -368,6 +368,21 @@ jobs:
           
           rm -rf package/feeds/packages/{exim,onionshare-cli,python-zope-event,python-zope-interface,python-gevent,python-twisted} 2>/dev/null || true
 
+          # Nikki feed publishes both mihomo-alpha and mihomo-meta as providers for the
+          # virtual mihomo package. Their mutual CONFLICTS entries can produce a Kconfig
+          # recursive dependency error, so keep the stable default provider only.
+          if [ "${{ steps.set-env.outputs.enable_nikki }}" = "true" ]; then
+            echo "🔧 固定 Nikki 使用 mihomo-meta..."
+            rm -rf feeds/nikki/mihomo-alpha package/feeds/nikki/mihomo-alpha 2>/dev/null || true
+            if [ -f "feeds/nikki/mihomo-meta/Makefile" ]; then
+              sed -i '/^[[:space:]]*CONFLICTS:=mihomo-alpha/d' "feeds/nikki/mihomo-meta/Makefile" || true
+            fi
+            if [ -f "package/feeds/nikki/mihomo-meta/Makefile" ]; then
+              sed -i '/^[[:space:]]*CONFLICTS:=mihomo-alpha/d' "package/feeds/nikki/mihomo-meta/Makefile" || true
+            fi
+            rm -rf tmp/.config* tmp/.packageinfo tmp/info/.packageinfo* 2>/dev/null || true
+          fi
+
           # QModem 相关修复
           if [ -d "package/feeds/qmodem" ]; then
             rm -rf package/feeds/qmodem/ndisc6 2>/dev/null || true
@@ -436,6 +451,9 @@ jobs:
                 echo "CONFIG_PACKAGE_nikki=y" >> .config
                 echo "CONFIG_PACKAGE_luci-app-nikki=y" >> .config
                 echo "CONFIG_PACKAGE_luci-i18n-nikki-zh-cn=y" >> .config
+                sed -i '/^CONFIG_PACKAGE_mihomo-alpha=/d; /^# CONFIG_PACKAGE_mihomo-alpha is not set/d; /^CONFIG_PACKAGE_mihomo-meta=/d; /^# CONFIG_PACKAGE_mihomo-meta is not set/d' .config
+                echo "# CONFIG_PACKAGE_mihomo-alpha is not set" >> .config
+                echo "CONFIG_PACKAGE_mihomo-meta=y" >> .config
                 # Nikki 依赖
                 echo "CONFIG_PACKAGE_ca-bundle=y" >> .config
                 echo "CONFIG_PACKAGE_curl=y" >> .config
@@ -461,6 +479,9 @@ jobs:
                 echo "CONFIG_PACKAGE_dockerd=y" >> .config
                 echo "CONFIG_PACKAGE_containerd=y" >> .config
                 echo "CONFIG_PACKAGE_runc=y" >> .config
+              elif [ "$pkg" = "vlmcsd" ]; then
+                echo "CONFIG_PACKAGE_luci-app-vlmcsd=y" >> .config
+                echo "CONFIG_PACKAGE_vlmcsd=y" >> .config
               else
                 echo "CONFIG_PACKAGE_luci-app-$pkg=y" >> .config
               fi
@@ -474,6 +495,8 @@ jobs:
                 disabled_pkgs+=("luci-app-adbyby-plus" "luci-i18n-adbyby-plus-zh-cn")
               elif [ "$pkg" = "dockerman" ]; then
                 disabled_pkgs+=("luci-app-dockerman" "luci-lib-docker")
+              elif [ "$pkg" = "vlmcsd" ]; then
+                disabled_pkgs+=("luci-app-vlmcsd" "vlmcsd")
               else
                 disabled_pkgs+=("luci-app-$pkg")
               fi
