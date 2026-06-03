@@ -241,27 +241,49 @@ patch_mtwifi_apcli_bssid_budget() {
 
 install_golang_feed() {
   local golang_dir="feeds/packages/lang/golang"
-  if [ -f "$golang_dir/golang/Makefile" ] && [ -f "$golang_dir/golang-package.mk" ]; then
-    rm -rf package/feeds/packages/golang
-    mkdir -p package/feeds/packages
-    ln -s ../../../feeds/packages/lang/golang/golang package/feeds/packages/golang
-    return 0
-  fi
+  golang_feed_is_go124() {
+    [ -f "$golang_dir/golang/Makefile" ] && grep -Eq 'PKG_VERSION:=1\.24\.|GO_VERSION[^:=]*:?=1\.24(\.|$)' "$golang_dir/golang/Makefile"
+  }
+  clean_stale_golang_host() {
+    local go_bin go_version
+    for go_bin in staging_dir/hostpkg/bin/go staging_dir/host/bin/go; do
+      [ -x "$go_bin" ] || continue
+      go_version="$($go_bin version 2>/dev/null || true)"
+      case "$go_version" in
+        *' go1.24.'*) return 0 ;;
+        *' go1.'*)
+          log "Removing stale host Go toolchain: $go_version"
+          rm -rf \
+            staging_dir/hostpkg/bin/go staging_dir/hostpkg/bin/gofmt staging_dir/hostpkg/lib/go \
+            staging_dir/host/bin/go staging_dir/host/bin/gofmt staging_dir/host/lib/go \
+            build_dir/hostpkg/golang-* build_dir/host/golang-* build_dir/host/go-* \
+            tmp/.packageinfo tmp/info/.packageinfo* tmp/.config-package.in 2>/dev/null || true
+          return 0
+          ;;
+      esac
+    done
+  }
 
-  local tmp_dir
-  tmp_dir="$(mktemp -d)"
-  if git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 24.x "$tmp_dir"; then
+  if ! golang_feed_is_go124; then
+    local tmp_dir
+    tmp_dir="$(mktemp -d)"
+    log "Installing Go 1.24 feed for Go packages"
+    if ! git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 24.x "$tmp_dir"; then
+      rm -rf "$tmp_dir"
+      die "Unable to clone packages_lang_golang 24.x"
+    fi
     rm -rf "$golang_dir"
     mv "$tmp_dir" "$golang_dir"
-  else
-    rm -rf "$tmp_dir"
   fi
 
   [ -f "$golang_dir/golang/Makefile" ] && [ -f "$golang_dir/golang-package.mk" ] || die "packages_lang_golang repository layout changed"
+  golang_feed_is_go124 || die "packages_lang_golang 24.x does not provide Go 1.24"
 
   rm -rf package/feeds/packages/golang
   mkdir -p package/feeds/packages
   ln -s ../../../feeds/packages/lang/golang/golang package/feeds/packages/golang
+  clean_stale_golang_host
+  rm -rf tmp/.packageinfo tmp/info/.packageinfo* tmp/.config-package.in 2>/dev/null || true
 }
 
 apply_package_fixes() {
