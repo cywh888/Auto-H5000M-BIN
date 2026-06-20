@@ -310,6 +310,49 @@ patch_mtwifi_apcli_bssid_budget() {
   fi
 }
 
+ensure_libcrypt_compat_package() {
+  local pkg_dir="package/libs/libcrypt-compat"
+  local pkg_makefile="$pkg_dir/Makefile"
+
+  if grep -Rqs 'Package/libcrypt-compat' package feeds 2>/dev/null; then
+    return 0
+  fi
+
+  log "Adding libcrypt-compat compatibility package stub"
+  mkdir -p "$pkg_dir"
+  cat > "$pkg_makefile" <<'EOF'
+include $(TOPDIR)/rules.mk
+
+PKG_NAME:=libcrypt-compat
+PKG_RELEASE:=1
+PKG_LICENSE:=Public-Domain
+
+include $(INCLUDE_DIR)/package.mk
+
+define Package/libcrypt-compat
+  SECTION:=libs
+  CATEGORY:=Libraries
+  TITLE:=libcrypt compatibility provider
+  DEPENDS:=@USE_GLIBC
+  PKGARCH:=all
+endef
+
+define Package/libcrypt-compat/description
+Compatibility provider for packages that reference libcrypt-compat on glibc builds.
+Musl-based targets do not select this package, but its definition keeps package
+dependency scanning consistent with newer upstream Makefiles.
+endef
+
+define Build/Compile
+endef
+
+define Package/libcrypt-compat/install
+endef
+
+$(eval $(call BuildPackage,libcrypt-compat))
+EOF
+}
+
 verify_mtwifi_patch() {
   local cfg_file="package/mtk/applications/mtwifi-cfg/files/mtwifi-cfg/mtwifi_cfg"
   local netifd_file="package/mtk/applications/mtwifi-cfg/files/netifd/mtwifi.sh"
@@ -379,6 +422,7 @@ apply_package_fixes() {
 
   patch_mtwifi_apcli_bssid_budget
   verify_mtwifi_patch
+  ensure_libcrypt_compat_package
 
   local ebtables_makefile="package/network/utils/ebtables/Makefile"
   if [ -f "$ebtables_makefile" ] && grep -qE 'git(://|s://git\.)netfilter\.org/ebtables' "$ebtables_makefile"; then
@@ -500,6 +544,7 @@ install_selected_packages() {
   fi
 
   if is_true "$ENABLE_UPNP"; then
+    feed_install_pkg miniupnpd-nftables
     feed_install_pkg luci-app-upnp
   fi
 
@@ -589,7 +634,15 @@ EOF
 
   is_true "$ENABLE_ADGUARDHOME" && { echo "CONFIG_PACKAGE_luci-app-adguardhome=y" >> .config; echo "CONFIG_PACKAGE_luci-i18n-adguardhome-zh-cn=y" >> .config; } || disabled_pkgs+=("luci-app-adguardhome" "luci-i18n-adguardhome-zh-cn")
   is_true "$ENABLE_OPENCLASH" && echo "CONFIG_PACKAGE_luci-app-openclash=y" >> .config || disabled_pkgs+=("luci-app-openclash")
-  is_true "$ENABLE_UPNP" && echo "CONFIG_PACKAGE_luci-app-upnp=y" >> .config || disabled_pkgs+=("luci-app-upnp")
+  if is_true "$ENABLE_UPNP"; then
+    cat >> .config <<'EOF'
+CONFIG_PACKAGE_luci-app-upnp=y
+CONFIG_PACKAGE_miniupnpd-nftables=y
+CONFIG_PACKAGE_rpcd-mod-ucode=y
+EOF
+  else
+    disabled_pkgs+=("luci-app-upnp" "miniupnpd-nftables" "miniupnpd-iptables")
+  fi
   is_true "$ENABLE_VLMCSD" && { echo "CONFIG_PACKAGE_luci-app-vlmcsd=y" >> .config; echo "CONFIG_PACKAGE_vlmcsd=y" >> .config; } || disabled_pkgs+=("luci-app-vlmcsd" "vlmcsd")
   if is_true "$ENABLE_MOSDNS"; then
     cat >> .config <<'EOF'
@@ -617,6 +670,12 @@ CONFIG_PACKAGE_ca-bundle=y
 EOF
   else
     disabled_pkgs+=("luci-app-homeproxy")
+  fi
+
+  if is_true "$ENABLE_UPNP"; then
+    config_enable PACKAGE_luci-app-upnp
+    config_enable PACKAGE_miniupnpd-nftables
+    config_enable PACKAGE_rpcd-mod-ucode
   fi
   is_true "$ENABLE_ADBYBY_PLUS" && { echo "CONFIG_PACKAGE_luci-app-adbyby-plus=y" >> .config; echo "CONFIG_PACKAGE_luci-i18n-adbyby-plus-zh-cn=y" >> .config; echo "CONFIG_PACKAGE_ipset=y" >> .config; } || disabled_pkgs+=("luci-app-adbyby-plus" "luci-i18n-adbyby-plus-zh-cn")
 
@@ -724,6 +783,7 @@ EOF
   verify_enabled_pkg "Nikki mihomo-meta" "mihomo-meta" "$ENABLE_NIKKI"
   verify_enabled_pkg "OpenClash" "luci-app-openclash" "$ENABLE_OPENCLASH"
   verify_enabled_pkg "UPnP" "luci-app-upnp" "$ENABLE_UPNP"
+  verify_enabled_pkg "UPnP miniupnpd" "miniupnpd-nftables" "$ENABLE_UPNP"
   verify_enabled_pkg "VLMCSd" "luci-app-vlmcsd" "$ENABLE_VLMCSD"
   verify_enabled_pkg "MosDNS" "luci-app-mosdns" "$ENABLE_MOSDNS"
   verify_enabled_pkg "MosDNS core" "mosdns" "$ENABLE_MOSDNS"
