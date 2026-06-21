@@ -28,6 +28,8 @@ HOMEPROXY_REPO_URL="${HOMEPROXY_REPO_URL:-https://github.com/immortalwrt/homepro
 HOMEPROXY_REPO_BRANCH="${HOMEPROXY_REPO_BRANCH:-master}"
 HOMEPROXY_FALLBACK_REPO_URL="${HOMEPROXY_FALLBACK_REPO_URL:-https://github.com/VIKINGYFY/homeproxy}"
 HOMEPROXY_FALLBACK_REPO_BRANCH="${HOMEPROXY_FALLBACK_REPO_BRANCH:-main}"
+ADBYBY_PLUS_I18N_IPK_URL="${ADBYBY_PLUS_I18N_IPK_URL:-https://github.com/kongfl888/luci-app-adbyby-plus-lite/releases/download/2.0K5/luci-i18n-adbyby-plus-zh-cn_221024.22052_all.ipk}"
+ADGUARDHOME_I18N_IPK_URL="${ADGUARDHOME_I18N_IPK_URL:-https://github.com/kongfl888/luci-app-adguardhome/releases/download/v1.8-20221120/luci-i18n-adguardhome-zh-cn_git-22.323.68542-450e04a_all.ipk}"
 
 ENABLE_ADGUARDHOME="${ENABLE_ADGUARDHOME:-false}"
 ENABLE_OPENCLASH="${ENABLE_OPENCLASH:-false}"
@@ -304,7 +306,7 @@ prepare_feeds() {
     sed -i '/qmodem/d' feeds.conf.default
   fi
 
-  rm -rf tmp/.config* tmp/.packageinfo tmp/.targetinfo tmp/info tmp/.feeds* 2>/dev/null || true
+  rm -rf tmp/.config* tmp/.packageinfo tmp/.targetinfo tmp/info tmp/.feeds* feeds/*.tmp 2>/dev/null || true
   ! is_true "$ENABLE_NIKKI" && rm -rf feeds/nikki* package/feeds/nikki 2>/dev/null || true
   ! is_true "$ENABLE_QMODEM_NEXT" && ! is_true "$ENABLE_QMODEM" && rm -rf feeds/qmodem* package/feeds/qmodem 2>/dev/null || true
 
@@ -529,6 +531,31 @@ patch_mosdns_go124() {
   rm -rf build_dir/target-*/mosdns-* 2>/dev/null || true
 }
 
+patch_v2ray_geodata_downloads() {
+  local geodata_makefile="package/v2ray-geodata/Makefile"
+  [ -f "$geodata_makefile" ] || return 0
+
+  local tmp_makefile
+  tmp_makefile="$(mktemp)"
+  awk '
+    /^define Build\/Compile$/ {
+      print "define Build/Compile"
+      print "\t( cd $(PKG_BUILD_DIR); rm -f geoip.dat geosite.dat; download_dat() { output=\"$$$$1\"; shift; for url in \"$$$$@\"; do [ -n \"$$$$url\" ] || continue; curl -fL --retry 5 --retry-delay 2 --connect-timeout 20 \"$$$$url\" -o \"$$$$output.tmp\" && [ -s \"$$$$output.tmp\" ] && mv \"$$$$output.tmp\" \"$$$$output\" && return 0; rm -f \"$$$$output.tmp\"; done; echo \"Unable to download $$$$output\" >&2; return 1; }; download_dat geoip.dat $(GEOIP_URL) https://ghfast.top/$(GEOIP_URL) https://gh-proxy.com/$(GEOIP_URL) https://gh.llkk.cc/$(GEOIP_URL); download_dat geosite.dat $(GEOSITE_URL) https://ghfast.top/$(GEOSITE_URL) https://gh-proxy.com/$(GEOSITE_URL) https://gh.llkk.cc/$(GEOSITE_URL); [ -s geoip.dat ] && [ -s geosite.dat ]; )"
+      print "endef"
+      collecting=1
+      next
+    }
+    collecting {
+      if ($0 == "endef") collecting=0
+      next
+    }
+    { print }
+  ' "$geodata_makefile" > "$tmp_makefile"
+  mv "$tmp_makefile" "$geodata_makefile"
+
+  rm -rf build_dir/target-*/v2ray-geodata 2>/dev/null || true
+}
+
 patch_mtwifi_apcli_bssid_budget() {
   local patch_file="$ROOT_DIR/patches/mtwifi-apcli-active-only.patch"
   [ -f "$patch_file" ] || return 0
@@ -540,6 +567,130 @@ patch_mtwifi_apcli_bssid_budget() {
   else
     die "Unable to apply MTK WiFi APCLI active-only patch"
   fi
+}
+
+patch_mtk_wifi_utility_rbus_for_h5000m() {
+  local rbus_patch="target/linux/mediatek/patches-6.6/0101-add-mtk-wifi-utility-rbus.patch"
+  [ -f "$rbus_patch" ] || return 0
+
+  if grep -q '^+obj-y[[:space:]]*+=[[:space:]]*wifi_utility/' "$rbus_patch"; then
+    log "Making MTK wifi_utility rbus optional for H5000M PCIe WiFi"
+    sed -i 's/^+obj-y[[:space:]]*+=[[:space:]]*wifi_utility\//+obj-$(CONFIG_MTK_WIFI_UTILITY_RBUS) += wifi_utility\//g' "$rbus_patch"
+  fi
+
+  grep -q '^+obj-$(CONFIG_MTK_WIFI_UTILITY_RBUS)[[:space:]]*+=[[:space:]]*wifi_utility/' "$rbus_patch" || \
+    die "MTK wifi_utility rbus patch guard verification failed"
+}
+
+github_url_base_candidates() {
+  local url="$1"
+  local source_name="$2"
+  local base_url="${url%/$source_name}"
+
+  printf '%s\n' "$base_url"
+  case "$base_url" in
+    https://github.com/*|https://raw.githubusercontent.com/*)
+      local prefix
+      for prefix in $GITHUB_PROXY_PREFIXES; do
+        [ -n "$prefix" ] || continue
+        printf '%s%s\n' "${prefix%/}/" "$base_url"
+      done
+      ;;
+  esac
+}
+
+ensure_prebuilt_luci_i18n_package() {
+  local pkg_name="$1"
+  local version="$2"
+  local ipk_url="$3"
+  local app_dep="$4"
+  local title="$5"
+  local source_name="${ipk_url##*/}"
+  local pkg_dir="package/prebuilt-i18n/$pkg_name"
+  local source_urls
+
+  source_urls="$(github_url_base_candidates "$ipk_url" "$source_name" | tr '\n' ' ')"
+  rm -rf "$pkg_dir"
+  mkdir -p "$pkg_dir"
+
+  cat > "$pkg_dir/Makefile" <<EOF
+include \$(TOPDIR)/rules.mk
+
+PKG_NAME:=$pkg_name
+PKG_VERSION:=$version
+PKG_RELEASE:=1
+PKG_SOURCE:=$source_name
+PKG_SOURCE_URL:=$source_urls
+PKG_HASH:=skip
+PKG_BUILD_DIR:=\$(BUILD_DIR)/\$(PKG_NAME)-\$(PKG_VERSION)
+
+include \$(INCLUDE_DIR)/package.mk
+
+define Package/$pkg_name
+  SECTION:=luci
+  CATEGORY:=LuCI
+  SUBMENU:=Translations
+  TITLE:=$title
+  DEPENDS:=+$app_dep
+  PKGARCH:=all
+endef
+
+define Build/Prepare
+	rm -rf \$(PKG_BUILD_DIR)
+	mkdir -p \$(PKG_BUILD_DIR)/ipk \$(PKG_BUILD_DIR)/data
+	if ar t \$(DL_DIR)/\$(PKG_SOURCE) >/dev/null 2>&1; then \
+		(cd \$(PKG_BUILD_DIR)/ipk; ar x \$(DL_DIR)/\$(PKG_SOURCE)); \
+	else \
+		tar -xf \$(DL_DIR)/\$(PKG_SOURCE) -C \$(PKG_BUILD_DIR)/ipk; \
+	fi
+	if [ -f \$(PKG_BUILD_DIR)/ipk/data.tar.gz ]; then \
+		tar -xzf \$(PKG_BUILD_DIR)/ipk/data.tar.gz -C \$(PKG_BUILD_DIR)/data; \
+	elif [ -f \$(PKG_BUILD_DIR)/ipk/data.tar.xz ]; then \
+		tar -xJf \$(PKG_BUILD_DIR)/ipk/data.tar.xz -C \$(PKG_BUILD_DIR)/data; \
+	elif [ -f \$(PKG_BUILD_DIR)/ipk/data.tar.zst ]; then \
+		tar --zstd -xf \$(PKG_BUILD_DIR)/ipk/data.tar.zst -C \$(PKG_BUILD_DIR)/data; \
+	else \
+		echo "Unsupported ipk data archive for \$(PKG_SOURCE)" >&2; exit 1; \
+	fi
+endef
+
+define Build/Compile
+endef
+
+define Package/$pkg_name/install
+	\$(CP) \$(PKG_BUILD_DIR)/data/. \$(1)/
+endef
+
+\$(eval \$(call BuildPackage,$pkg_name))
+EOF
+}
+
+ensure_external_luci_i18n_packages() {
+  is_true "$ENABLE_ADBYBY_PLUS" && ensure_prebuilt_luci_i18n_package \
+    luci-i18n-adbyby-plus-zh-cn \
+    221024.22052 \
+    "$ADBYBY_PLUS_I18N_IPK_URL" \
+    luci-app-adbyby-plus \
+    "Adbyby Plus Chinese translation"
+
+  is_true "$ENABLE_ADGUARDHOME" && ensure_prebuilt_luci_i18n_package \
+    luci-i18n-adguardhome-zh-cn \
+    git-22.323.68542-450e04a \
+    "$ADGUARDHOME_I18N_IPK_URL" \
+    luci-app-adguardhome \
+    "AdGuardHome Chinese translation"
+}
+
+patch_homeproxy_no_wan_default_interface() {
+  local hp_client="package/luci-app-homeproxy/root/etc/homeproxy/scripts/generate_client.uc"
+  [ -f "$hp_client" ] || return 0
+
+  if grep -q "let wan_dns = ubus.call('network.interface', 'status', {'interface': 'wan'})" "$hp_client"; then
+    sed -i "s|let wan_dns = ubus.call('network.interface', 'status', {'interface': 'wan'})?.\['dns-server'\]?.\[0\];|let wan_status = ubus.call('network.interface', 'status', {'interface': 'wan'});\nlet wan_dns = wan_status?.['dns-server']?.[0];|" "$hp_client"
+  fi
+  sed -i "s|auto_detect_interface: isEmpty(default_interface) ? true : null,|auto_detect_interface: (isEmpty(default_interface) \&\& wan_status?.up) ? true : null,|" "$hp_client"
+
+  grep -q "wan_status?.up" "$hp_client" || die "HomeProxy no-WAN default interface patch verification failed"
 }
 
 ensure_libcrypt_compat_package() {
@@ -652,8 +803,10 @@ apply_package_fixes() {
   log "Applying package fixes"
   cd "$ROOT_DIR/$SOURCE_DIR"
 
+  patch_mtk_wifi_utility_rbus_for_h5000m
   patch_mtwifi_apcli_bssid_budget
   verify_mtwifi_patch
+  ensure_external_luci_i18n_packages
 
   local ebtables_makefile="package/network/utils/ebtables/Makefile"
   if [ -f "$ebtables_makefile" ] && grep -qE 'git(://|s://git\.)netfilter\.org/ebtables' "$ebtables_makefile"; then
@@ -716,10 +869,7 @@ apply_package_fixes() {
     [ ! -d "package/mosdns" ] && git_clone_retry https://github.com/sbwml/luci-app-mosdns v5 package/mosdns 1
     patch_mosdns_go124
     [ ! -d "package/v2ray-geodata" ] && git_clone_retry https://github.com/sbwml/v2ray-geodata "" package/v2ray-geodata 1
-    local geodata_makefile="package/v2ray-geodata/Makefile"
-    if [ -f "$geodata_makefile" ]; then
-      sed -i 's/curl -L /curl -L --retry 5 --retry-delay 2 --connect-timeout 20 /g' "$geodata_makefile"
-    fi
+    patch_v2ray_geodata_downloads
   fi
 
   if is_true "$ENABLE_HOMEPROXY"; then
@@ -729,6 +879,7 @@ apply_package_fixes() {
         die "Unable to fetch luci-app-homeproxy"
     fi
     [ -f "package/luci-app-homeproxy/Makefile" ] || die "luci-app-homeproxy repository layout changed"
+    patch_homeproxy_no_wan_default_interface
   fi
 
   if is_true "$ENABLE_EASYMESH"; then
@@ -832,6 +983,7 @@ config_disable() {
 
 enable_upnp_stack_config() {
   config_enable PACKAGE_luci-app-upnp
+  config_enable PACKAGE_luci-i18n-upnp-zh-cn
   config_enable PACKAGE_miniupnpd-nftables
   config_enable PACKAGE_rpcd-mod-ucode
   config_enable PACKAGE_libcap-ng
@@ -854,7 +1006,30 @@ enable_easymesh_stack_config() {
   config_enable PACKAGE_kmod-cfg80211
   config_enable PACKAGE_kmod-mac80211
   config_enable PACKAGE_luci-app-mtwifi-cfg
+  config_enable PACKAGE_luci-i18n-mtwifi-cfg-zh-cn
   config_enable PACKAGE_mtwifi-cfg
+}
+
+enable_h5000m_wifi_driver_config() {
+  config_enable USE_RFKILL
+  config_enable PACKAGE_blkid
+  config_enable PACKAGE_kmod-mt_wifi_cmn
+  config_enable PACKAGE_kmod-mt_wifi7
+  config_enable PACKAGE_kmod-mt_hwifi
+  config_enable MTK_HWIFI_PCI_SUPPORT
+  config_enable MTK_HWIFI_CONNAC_IF_SUPPORT
+  config_enable MTK_HWIFI_WED_SUPPORT
+  config_enable MTK_HWIFI_MT7992
+  config_enable MTK_HWIFI_MT799A
+  config_enable PACKAGE_kmod-mtk_pci
+  config_enable PACKAGE_kmod-mtk_wed
+  config_enable PACKAGE_kmod-connac_if
+  config_enable PACKAGE_kmod-mt7992
+  config_enable PACKAGE_kmod-mt799a
+  config_enable PACKAGE_mtwifi-cfg
+  config_enable PACKAGE_luci-app-mtwifi-cfg
+  config_enable PACKAGE_luci-i18n-mtwifi-cfg-zh-cn
+  config_enable PACKAGE_wireless-regdb
 }
 
 verify_mtk_easymesh_assets() {
@@ -929,6 +1104,27 @@ configure_build() {
 
   cp base.config .config
   [ -f "$ROOT_DIR/h5000m.extra.config" ] && cat "$ROOT_DIR/h5000m.extra.config" >> .config
+  echo "CONFIG_PACKAGE_luci-i18n-mtwifi-cfg-zh-cn=y" >> .config
+  cat >> .config <<'EOF'
+CONFIG_USE_RFKILL=y
+CONFIG_PACKAGE_blkid=y
+CONFIG_PACKAGE_kmod-mt_wifi_cmn=y
+CONFIG_PACKAGE_kmod-mt_wifi7=y
+CONFIG_PACKAGE_kmod-mt_hwifi=y
+CONFIG_MTK_HWIFI_PCI_SUPPORT=y
+CONFIG_MTK_HWIFI_CONNAC_IF_SUPPORT=y
+CONFIG_MTK_HWIFI_WED_SUPPORT=y
+CONFIG_MTK_HWIFI_MT7992=y
+CONFIG_MTK_HWIFI_MT799A=y
+CONFIG_PACKAGE_kmod-mtk_pci=y
+CONFIG_PACKAGE_kmod-mtk_wed=y
+CONFIG_PACKAGE_kmod-connac_if=y
+CONFIG_PACKAGE_kmod-mt7992=y
+CONFIG_PACKAGE_kmod-mt799a=y
+CONFIG_PACKAGE_mtwifi-cfg=y
+CONFIG_PACKAGE_luci-app-mtwifi-cfg=y
+CONFIG_PACKAGE_wireless-regdb=y
+EOF
 
   local disabled_pkgs=("luci-app-sms-tool-lite" "luci-app-3ginfo-lite")
 
@@ -960,6 +1156,7 @@ EOF
 CONFIG_PACKAGE_mesh11sd=y
 CONFIG_PACKAGE_wpad-mesh-openssl=y
 CONFIG_PACKAGE_luci-app-mtwifi-cfg=y
+CONFIG_PACKAGE_luci-i18n-mtwifi-cfg-zh-cn=y
 CONFIG_PACKAGE_mtwifi-cfg=y
 EOF
   else
@@ -968,6 +1165,7 @@ EOF
   if is_true "$ENABLE_UPNP"; then
     cat >> .config <<'EOF'
 CONFIG_PACKAGE_luci-app-upnp=y
+CONFIG_PACKAGE_luci-i18n-upnp-zh-cn=y
 CONFIG_PACKAGE_miniupnpd-nftables=y
 CONFIG_PACKAGE_rpcd-mod-ucode=y
 CONFIG_PACKAGE_libcap-ng=y
@@ -976,24 +1174,26 @@ CONFIG_PACKAGE_libuuid=y
 CONFIG_PACKAGE_libnftnl=y
 EOF
   else
-    disabled_pkgs+=("luci-app-upnp" "miniupnpd-nftables" "miniupnpd-iptables")
+    disabled_pkgs+=("luci-app-upnp" "luci-i18n-upnp-zh-cn" "miniupnpd-nftables" "miniupnpd-iptables")
   fi
-  is_true "$ENABLE_VLMCSD" && { echo "CONFIG_PACKAGE_luci-app-vlmcsd=y" >> .config; echo "CONFIG_PACKAGE_vlmcsd=y" >> .config; } || disabled_pkgs+=("luci-app-vlmcsd" "vlmcsd")
+  is_true "$ENABLE_VLMCSD" && { echo "CONFIG_PACKAGE_luci-app-vlmcsd=y" >> .config; echo "CONFIG_PACKAGE_luci-i18n-vlmcsd-zh-cn=y" >> .config; echo "CONFIG_PACKAGE_vlmcsd=y" >> .config; } || disabled_pkgs+=("luci-app-vlmcsd" "luci-i18n-vlmcsd-zh-cn" "vlmcsd")
   if is_true "$ENABLE_MOSDNS"; then
     cat >> .config <<'EOF'
 CONFIG_PACKAGE_luci-app-mosdns=y
+CONFIG_PACKAGE_luci-i18n-mosdns-zh-cn=y
 CONFIG_PACKAGE_mosdns=y
 CONFIG_PACKAGE_v2dat=y
 CONFIG_PACKAGE_v2ray-geoip=y
 CONFIG_PACKAGE_v2ray-geosite=y
 EOF
   else
-    disabled_pkgs+=("luci-app-mosdns" "mosdns" "v2dat" "v2ray-geoip" "v2ray-geosite")
+    disabled_pkgs+=("luci-app-mosdns" "luci-i18n-mosdns-zh-cn" "mosdns" "v2dat" "v2ray-geoip" "v2ray-geosite")
   fi
-  is_true "$ENABLE_MWAN" && echo "CONFIG_PACKAGE_luci-app-mwan3=y" >> .config || disabled_pkgs+=("luci-app-mwan3")
+  is_true "$ENABLE_MWAN" && { echo "CONFIG_PACKAGE_luci-app-mwan3=y" >> .config; echo "CONFIG_PACKAGE_luci-i18n-mwan3-zh-cn=y" >> .config; } || disabled_pkgs+=("luci-app-mwan3" "luci-i18n-mwan3-zh-cn")
   if is_true "$ENABLE_HOMEPROXY"; then
     cat >> .config <<'EOF'
 CONFIG_PACKAGE_luci-app-homeproxy=y
+CONFIG_PACKAGE_luci-i18n-homeproxy-zh-cn=y
 CONFIG_PACKAGE_sing-box=y
 CONFIG_PACKAGE_firewall4=y
 CONFIG_PACKAGE_kmod-nft-tproxy=y
@@ -1004,7 +1204,7 @@ CONFIG_PACKAGE_ucode-mod-digest=y
 CONFIG_PACKAGE_ca-bundle=y
 EOF
   else
-    disabled_pkgs+=("luci-app-homeproxy")
+    disabled_pkgs+=("luci-app-homeproxy" "luci-i18n-homeproxy-zh-cn")
   fi
 
   if is_true "$ENABLE_UPNP"; then
@@ -1018,6 +1218,7 @@ EOF
   if is_true "$ENABLE_DOCKERMAN"; then
     cat >> .config <<'EOF'
 CONFIG_PACKAGE_luci-app-dockerman=y
+CONFIG_PACKAGE_luci-i18n-dockerman-zh-cn=y
 CONFIG_PACKAGE_luci-lib-docker=y
 CONFIG_PACKAGE_docker=y
 CONFIG_PACKAGE_dockerd=y
@@ -1025,7 +1226,7 @@ CONFIG_PACKAGE_containerd=y
 CONFIG_PACKAGE_runc=y
 EOF
   else
-    disabled_pkgs+=("luci-app-dockerman" "luci-lib-docker")
+    disabled_pkgs+=("luci-app-dockerman" "luci-i18n-dockerman-zh-cn" "luci-lib-docker")
   fi
 
   if is_true "$ENABLE_ORIGINAL_MODEM"; then
@@ -1038,6 +1239,7 @@ EOF
 
   if is_true "$ENABLE_QMODEM_NEXT"; then
     echo "CONFIG_PACKAGE_luci-app-qmodem-next=y" >> .config
+    echo "CONFIG_PACKAGE_luci-i18n-qmodem-next-zh-cn=y" >> .config
   elif is_true "$ENABLE_QMODEM"; then
     cat >> .config <<'EOF'
 CONFIG_PACKAGE_luci-app-qmodem=y
@@ -1064,7 +1266,7 @@ CONFIG_PACKAGE_luci-app-mwan3=y
 CONFIG_PACKAGE_mtkhqos_util=y
 EOF
   else
-    disabled_pkgs+=("luci-app-qmodem-next" "luci-app-qmodem")
+    disabled_pkgs+=("luci-app-qmodem-next" "luci-i18n-qmodem-next-zh-cn" "luci-app-qmodem")
   fi
 
   local all_disabled=("luci-app-wrtbwmon" "luci-app-rclone" "rclone" "rclone-ng" "rclone-webui-react" "${disabled_pkgs[@]}")
@@ -1082,8 +1284,12 @@ EOF
     config_enable PACKAGE_luci-i18n-nikki-zh-cn
   fi
 
+  config_enable PACKAGE_luci-i18n-mtwifi-cfg-zh-cn
+  enable_h5000m_wifi_driver_config
+
   if is_true "$ENABLE_MOSDNS"; then
     config_enable PACKAGE_luci-app-mosdns
+    config_enable PACKAGE_luci-i18n-mosdns-zh-cn
     config_enable PACKAGE_mosdns
     config_enable PACKAGE_v2dat
     config_enable PACKAGE_v2ray-geoip
@@ -1101,6 +1307,7 @@ EOF
 
   if is_true "$ENABLE_HOMEPROXY"; then
     config_enable PACKAGE_luci-app-homeproxy
+    config_enable PACKAGE_luci-i18n-homeproxy-zh-cn
     config_enable PACKAGE_sing-box
     config_enable PACKAGE_kmod-nft-tproxy
     config_enable PACKAGE_kmod-inet-diag
@@ -1111,6 +1318,7 @@ EOF
   if is_true "$ENABLE_VLMCSD"; then
     config_enable PACKAGE_vlmcsd
     config_enable PACKAGE_luci-app-vlmcsd
+    config_enable PACKAGE_luci-i18n-vlmcsd-zh-cn
   fi
 
   run_with_timeout "$CONFIG_TIMEOUT" "make defconfig" make defconfig
@@ -1125,26 +1333,56 @@ EOF
   fi
 
   verify_enabled_pkg "Nikki" "luci-app-nikki" "$ENABLE_NIKKI"
+  verify_enabled_pkg "Nikki zh-cn" "luci-i18n-nikki-zh-cn" "$ENABLE_NIKKI"
   verify_enabled_pkg "Nikki core" "nikki" "$ENABLE_NIKKI"
   verify_enabled_pkg "Nikki mihomo-meta" "mihomo-meta" "$ENABLE_NIKKI"
   verify_enabled_pkg "OpenClash" "luci-app-openclash" "$ENABLE_OPENCLASH"
+  verify_enabled_pkg "AdGuardHome" "luci-app-adguardhome" "$ENABLE_ADGUARDHOME"
+  verify_enabled_pkg "AdGuardHome zh-cn" "luci-i18n-adguardhome-zh-cn" "$ENABLE_ADGUARDHOME"
   verify_enabled_pkg "UPnP" "luci-app-upnp" "$ENABLE_UPNP"
+  verify_enabled_pkg "UPnP zh-cn" "luci-i18n-upnp-zh-cn" "$ENABLE_UPNP"
   verify_enabled_pkg "UPnP miniupnpd" "miniupnpd-nftables" "$ENABLE_UPNP"
   verify_enabled_pkg "VLMCSd" "luci-app-vlmcsd" "$ENABLE_VLMCSD"
+  verify_enabled_pkg "VLMCSd zh-cn" "luci-i18n-vlmcsd-zh-cn" "$ENABLE_VLMCSD"
   verify_enabled_pkg "MosDNS" "luci-app-mosdns" "$ENABLE_MOSDNS"
+  verify_enabled_pkg "MosDNS zh-cn" "luci-i18n-mosdns-zh-cn" "$ENABLE_MOSDNS"
   verify_enabled_pkg "MosDNS core" "mosdns" "$ENABLE_MOSDNS"
   verify_enabled_pkg "MosDNS v2dat" "v2dat" "$ENABLE_MOSDNS"
   verify_enabled_pkg "MosDNS geoip" "v2ray-geoip" "$ENABLE_MOSDNS"
   verify_enabled_pkg "MosDNS geosite" "v2ray-geosite" "$ENABLE_MOSDNS"
   verify_enabled_pkg "DockerMan" "luci-app-dockerman" "$ENABLE_DOCKERMAN"
+  verify_enabled_pkg "DockerMan zh-cn" "luci-i18n-dockerman-zh-cn" "$ENABLE_DOCKERMAN"
   verify_enabled_pkg "QModem Next" "luci-app-qmodem-next" "$ENABLE_QMODEM_NEXT"
+  verify_enabled_pkg "QModem Next zh-cn" "luci-i18n-qmodem-next-zh-cn" "$ENABLE_QMODEM_NEXT"
   verify_enabled_pkg "MWAN" "luci-app-mwan3" "$ENABLE_MWAN"
+  verify_enabled_pkg "MWAN zh-cn" "luci-i18n-mwan3-zh-cn" "$ENABLE_MWAN"
   verify_enabled_pkg "HomeProxy" "luci-app-homeproxy" "$ENABLE_HOMEPROXY"
+  verify_enabled_pkg "HomeProxy zh-cn" "luci-i18n-homeproxy-zh-cn" "$ENABLE_HOMEPROXY"
   verify_enabled_pkg "HomeProxy sing-box" "sing-box" "$ENABLE_HOMEPROXY"
   verify_enabled_pkg "HomeProxy nft tproxy" "kmod-nft-tproxy" "$ENABLE_HOMEPROXY"
   verify_enabled_pkg "Adbyby Plus" "luci-app-adbyby-plus" "$ENABLE_ADBYBY_PLUS"
+  verify_enabled_pkg "Adbyby Plus zh-cn" "luci-i18n-adbyby-plus-zh-cn" "$ENABLE_ADBYBY_PLUS"
   verify_enabled_pkg "EasyMesh mesh daemon" "mesh11sd" "$ENABLE_EASYMESH"
   verify_enabled_pkg "EasyMesh wpad mesh" "wpad-mesh-openssl" "$ENABLE_EASYMESH"
+  verify_enabled_pkg "MT WiFi zh-cn" "luci-i18n-mtwifi-cfg-zh-cn" true
+  verify_config_symbol "H5000M USE_RFKILL dependency" "CONFIG_USE_RFKILL=y"
+  verify_enabled_pkg "H5000M blkid dependency" "blkid" true
+  verify_enabled_pkg "H5000M MT WiFi common" "kmod-mt_wifi_cmn" true
+  verify_enabled_pkg "H5000M MT WiFi7 driver" "kmod-mt_wifi7" true
+  verify_enabled_pkg "H5000M MT HWIFI driver" "kmod-mt_hwifi" true
+  verify_config_symbol "H5000M HWIFI PCI support" "CONFIG_MTK_HWIFI_PCI_SUPPORT=y"
+  verify_config_symbol "H5000M HWIFI CONNAC interface" "CONFIG_MTK_HWIFI_CONNAC_IF_SUPPORT=y"
+  verify_config_symbol "H5000M HWIFI WED support" "CONFIG_MTK_HWIFI_WED_SUPPORT=y"
+  verify_config_symbol "H5000M MT7992 Kconfig" "CONFIG_MTK_HWIFI_MT7992=y"
+  verify_config_symbol "H5000M MT799A Kconfig" "CONFIG_MTK_HWIFI_MT799A=y"
+  verify_enabled_pkg "H5000M MTK PCI driver" "kmod-mtk_pci" true
+  verify_enabled_pkg "H5000M MTK WED driver" "kmod-mtk_wed" true
+  verify_enabled_pkg "H5000M Connac interface" "kmod-connac_if" true
+  verify_enabled_pkg "H5000M MT7992 chip driver" "kmod-mt7992" true
+  verify_enabled_pkg "H5000M MT799A chip driver" "kmod-mt799a" true
+  verify_translation_file "AdGuardHome built-in zh-cn" "package/luci-app-adguardhome/po/zh-cn/AdGuardHome.po" "$ENABLE_ADGUARDHOME"
+  verify_translation_file "OpenClash built-in zh-cn" "package/luci-app-openclash/po/zh-cn/openclash.zh-cn.po" "$ENABLE_OPENCLASH"
+  verify_translation_file "Adbyby Plus built-in zh-cn" "package/luci-app-adbyby-plus/po/zh-cn/adbyby.po" "$ENABLE_ADBYBY_PLUS"
   verify_mtk_easymesh_assets
 }
 
@@ -1156,6 +1394,25 @@ verify_enabled_pkg() {
     echo "${feature_name} requested but CONFIG_PACKAGE_${config_name}=y is not active after defconfig" >&2
     grep -n "PACKAGE_${config_name}" .config || true
     exit 1
+  fi
+}
+
+verify_config_symbol() {
+  local feature_name="$1"
+  local expected_line="$2"
+  if ! grep -q "^${expected_line}$" .config; then
+    echo "${feature_name} required but ${expected_line} is not active after defconfig" >&2
+    grep -n "${expected_line%%=*}" .config || true
+    exit 1
+  fi
+}
+
+verify_translation_file() {
+  local feature_name="$1"
+  local file_path="$2"
+  local enabled="$3"
+  if is_true "$enabled" && [ ! -f "$file_path" ]; then
+    die "$feature_name requested but translation file is missing: $file_path"
   fi
 }
 
@@ -1213,6 +1470,12 @@ precompile_v2dat() {
   run_with_timeout "$V2DAT_TIMEOUT" "compile MosDNS v2dat" make package/mosdns/v2dat/compile V=s
 }
 
+clean_v2ray_geodata_build() {
+  is_true "$ENABLE_MOSDNS" || return 0
+  rm -rf build_dir/target-*/v2ray-geodata 2>/dev/null || true
+  rm -f staging_dir/target-*/stamp/.v2ray-geoip_installed staging_dir/target-*/stamp/.v2ray-geosite_installed 2>/dev/null || true
+}
+
 compile_firmware() {
   log "Compiling firmware with ${THREADS} threads"
   cd "$ROOT_DIR/$SOURCE_DIR"
@@ -1222,6 +1485,7 @@ compile_firmware() {
   log "Cleaning Go module cache before Go package builds"
   clean_go_mod_cache
   precompile_v2dat
+  clean_v2ray_geodata_build
 
   local start_time end_time duration
   start_time="$(date +%s)"
@@ -1251,8 +1515,39 @@ collect_artifacts() {
   mkdir -p "$ARTIFACTS_DIR"
 
   find "$SOURCE_DIR/bin/targets" -type f \( -name '*.bin' -o -name '*.img.gz' \) -exec cp -f {} "$ARTIFACTS_DIR/" \;
+  find "$SOURCE_DIR/bin/targets" -type f -name '*hiveton-h5000m*.manifest' -exec cp -f {} "$ARTIFACTS_DIR/openwrt-image.manifest" \; -quit
   if [ -z "$(ls -A "$ARTIFACTS_DIR" 2>/dev/null)" ]; then
     die "No firmware artifacts found under $SOURCE_DIR/bin/targets"
+  fi
+  [ -f "$ARTIFACTS_DIR/openwrt-image.manifest" ] || die "H5000M OpenWrt image manifest was not generated"
+
+  local image_pkg
+  for image_pkg in \
+    kmod-mt_wifi_cmn \
+    kmod-mt_wifi7 \
+    kmod-mt_hwifi \
+    kmod-mtk_pci \
+    kmod-mtk_wed \
+    kmod-connac_if \
+    kmod-mt7992 \
+    kmod-mt799a \
+    mtwifi-cfg \
+    luci-app-mtwifi-cfg \
+    luci-i18n-mtwifi-cfg-zh-cn \
+    mesh11sd \
+    wpad-mesh-openssl; do
+    grep -q "^${image_pkg}[[:space:]-]" "$ARTIFACTS_DIR/openwrt-image.manifest" || \
+      die "Firmware image manifest is missing required package: ${image_pkg}"
+  done
+
+  if is_true "$ENABLE_ADGUARDHOME" && ! grep -q '^luci-i18n-adguardhome-zh-cn[[:space:]-]' "$ARTIFACTS_DIR/openwrt-image.manifest"; then
+    die "Firmware image manifest is missing required package: luci-i18n-adguardhome-zh-cn"
+  fi
+  if is_true "$ENABLE_ADBYBY_PLUS" && ! grep -q '^luci-i18n-adbyby-plus-zh-cn[[:space:]-]' "$ARTIFACTS_DIR/openwrt-image.manifest"; then
+    die "Firmware image manifest is missing required package: luci-i18n-adbyby-plus-zh-cn"
+  fi
+  if is_true "$ENABLE_HOMEPROXY" && ! grep -q '^luci-app-homeproxy[[:space:]-]' "$ARTIFACTS_DIR/openwrt-image.manifest"; then
+    die "Firmware image manifest is missing required package: luci-app-homeproxy"
   fi
 
   {

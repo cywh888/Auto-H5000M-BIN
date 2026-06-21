@@ -302,8 +302,8 @@ jobs:
         if: steps.features.outputs.publish_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: ImmortalWrt H5000M #${{ github.run_number }}
+          tag_name: latest
+          name: ImmortalWrt H5000M Latest
           body: |
             🎉 **ImmortalWrt H5000M 固件已构建完成**
 
@@ -326,7 +326,9 @@ jobs:
             - Adbyby Plus: ${{ steps.features.outputs.enable_adbyby_plus }}
             - 原版 Modem:  ${{ steps.features.outputs.enable_original_modem }}
             - EasyMesh:    ${{ steps.features.outputs.enable_easymesh }}
-          prerelease: true
+          prerelease: false
+          make_latest: true
+          overwrite_files: true
           files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
